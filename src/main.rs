@@ -24,6 +24,9 @@ mod calculator {
         }
     }
 
+    //Quaternion {s: w, // scalare
+    //            v: Vector3 {x: x, y: y, z: z, }}
+
     xdevs::component!(
         ident = Calculator,
         input= {
@@ -60,9 +63,11 @@ mod calculator {
             /*quaternion form : Quaternion {s: w, // scalare
                                             v: Vector3 {x: x, y: y, z: z, }}*/
             
-            if let Some(quat) = input.data.get_values() {
+            let values = input.data.get_values();
+            if !values.is_empty() {
                 //quat is not empty so we take the values 
-                let mut w = quat.s;
+                let quat = values[0]; // first element
+                let w = quat.s;
                 let x = quat.v.x;
                 let y = quat.v.y;
                 let z = quat.v.z;
@@ -137,9 +142,10 @@ mod analyser {
             state.sigma -= e;
             state.clock += e;
             //recup orientation value from input
-            if let Some(orientation) = input.position.get_values() {
+            let values = input.position.get_values();
+            if !values.is_empty() {
                 //input port is not empty so we take the values 
-                let (roll, pitch, yaw) = orientation;
+                let (roll, pitch, yaw) = values[0];  // first element of list
 
                 let (roll_ref, pitch_ref, yaw_ref) = state.orientation_ref;
                 //calculate the absolut difference
@@ -171,7 +177,7 @@ xdevs::component!(
     couplings = {
         data -> calculator.data,
         calculator.position -> analyser.position,
-        controller.action -> action,
+        analyser.action -> action,
     }
 );
 
