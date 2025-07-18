@@ -1,8 +1,3 @@
-
-/*pub fn input_handler(
-    button: PinDriver<'static, Gpio14, Input>, 
-) -> impl FnMut(Duration, &mut CalculatorInput) {}*/
-
 mod data {
     use core::f64;
     use rand::Rng;
@@ -17,7 +12,7 @@ mod data {
     impl DataState {
         pub fn new() -> Self {
             Self {
-                sigma: f64::INFINITY,
+                sigma: 1.0,
                 clock: 0.0,
                 quat: mint::Quaternion { s: 1.0, v: mint::Vector3 { x: 0.0, y: 0.0, z: 0.0 } },
             }
@@ -39,7 +34,7 @@ mod data {
             let x: f64 = rand::thread_rng().gen_range(-1.0..=1.0);
             let y: f64 = rand::thread_rng().gen_range(-1.0..=1.0);
             let z: f64 = rand::thread_rng().gen_range(-1.0..=1.0);
-            // Normaliser le quaternion pour que ce soit un quaternion valide
+            // Normalize the quaternion to be a valid quaternion 
             let norm = (w*w + x*x + y*y + z*z).sqrt();
             let quat = mint::Quaternion {
                 s: w / norm,
@@ -48,7 +43,7 @@ mod data {
             state.quat = quat;
 
             println!(" Quaternion generated : {:?} at t={} ", state.quat, state.clock);
-            state.sigma = 0.0;
+            state.sigma = 1.;
         }
 
         fn lambda(state: &Self::State, output: &mut Self::Output) {
@@ -97,7 +92,7 @@ mod calculator {
     xdevs::component!(
         ident = Calculator,
         input= {
-            data<mint::Quaternion<f64>>,//??????
+            data<mint::Quaternion<f64>>,
         },
         output = {
             position<(f64, f64, f64)>,
@@ -155,97 +150,18 @@ mod calculator {
     }
 }
 
-mod analyser {
-    use core::f64;
-
-    #[derive(Default)]
-    pub struct AnalyserState {
-        sigma: f64,
-        clock: f64,
-        orientation_ref: (f64, f64, f64), //to initialize in main
-        tolerance: f64, //to initialize in main
-    }
-
-    impl AnalyserState {
-        pub fn new(orientation_ref:(f64, f64, f64), tolerance:f64) -> Self {
-            Self {
-                sigma: f64::INFINITY,
-                clock: 0.0,
-                orientation_ref,
-                tolerance,
-            }
-        }
-    }
-
-    xdevs::component!(
-        ident = Analyser,
-        input= {
-            position<(f64, f64, f64)>,
-        },
-        output = {
-            action<char>,
-        },
-        state = AnalyserState,
-    );
-
-    impl xdevs::Atomic for Analyser {
-        fn delta_int(state: &mut Self::State) {
-            //wait to have extern values from the calculator
-            state.clock += state.sigma;
-            println!("waiting orientation t={} ", state.clock);
-            state.sigma = f64::INFINITY;
-        }
-
-        fn lambda(state: &Self::State, output: &mut Self::Output) {
-            //put the instruction for the motor in output
-            
-        }
-
-        fn ta(state: &Self::State) -> f64 {
-            state.sigma
-        }
-
-        fn delta_ext(state: &mut Self::State, e: f64, input: &Self::Input) {
-            state.sigma -= e;
-            state.clock += e;
-            //recup orientation value from input
-            let values = input.position.get_values();
-            if !values.is_empty() {
-                //input port is not empty so we take the values 
-                let (roll, pitch, yaw) = values[0];  // first element of list
-
-                let (roll_ref, pitch_ref, yaw_ref) = state.orientation_ref;
-                //calculate the absolut difference
-                let roll_diff = (roll - roll_ref).abs();
-                let pitch_diff = (pitch - pitch_ref).abs();
-                let yaw_diff = (yaw - yaw_ref).abs();
-
-                if roll_diff>=state.tolerance || pitch_diff>=state.tolerance || yaw_diff>=state.tolerance {
-                    println!("Problem of position : satellite needs to move -> activation of motor");
-                    //how to know what to do with the motor??
-                }
-            }
-        }
-    }
-}
 
 xdevs::component!(
-    ident = DataCalculatorAnalyser,
-    //input = {
-        //data<mint::Quaternion<f64>>,
-    //},
+    ident = DataCalculator,
     output = {
-        action<char>,
+        position<(f64, f64, f64)>,
     },
     components = {
         data: data::Data,
         calculator: calculator::Calculator,
-        analyser:analyser::Analyser,
     },
     couplings = {
         data.data -> calculator.data,
-        calculator.position -> analyser.position,
-        analyser.action -> action,
     }
 );
 
@@ -259,22 +175,18 @@ fn main() {
 
     log::info!("Hello, world!");
 
-    let orientation_ref = (0., 0., 0.); //complete
-    let tolerance = 1.0; //complete
-
     let data= data::Data::new(data::DataState::new());
     let calculator = calculator::Calculator::new(calculator::CalculatorState::new());
-    let analyser = analyser::Analyser::new(analyser::AnalyserState::new(orientation_ref, tolerance));
 
-    let calculatoranalyser = DataCalculatorAnalyser::new(data, calculator, analyser);
+    let calculatoranalyser = DataCalculator::new(data, calculator);
 
     log::info!("Starting simulation!");
     let mut simulator = xdevs::simulator::Simulator::new(calculatoranalyser);
     let config = xdevs::simulator::Config::new(0.0, 60.0, 1.0, None);
-    //simulator.simulate_vt(&config);
-    simulator.simulate_rt(
+    simulator.simulate_vt(&config);
+    /*simulator.simulate_rt(
         &config,
         xdevs::simulator::std::sleep(&config),
         |_| {}, //hardware
-    );
+    );*/
 }

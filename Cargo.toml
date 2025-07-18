@@ -22,6 +22,10 @@ default = []
 
 experimental = ["esp-idf-svc/experimental"]
 
+[package.metadata.docs.rs]
+features = ["esp32c6"]
+targets  = ["riscv32imac-unknown-none-elf"]
+
 [dependencies]
 log = "0.4"
 esp-idf-svc = "0.51"
@@ -29,6 +33,7 @@ xdevs-no-std= {git="https://github.com/iscar-ucm/xdevs_no_std.rs.git", features=
 esp-idf-hal = {version="0.45.2", features =["rmt-legacy"]}
 mint = "^0.5.4"
 bno055 = "0.4.0"
+rand="0.8.5"
 
 
 # --- Optional Embassy Integration ---
